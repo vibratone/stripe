@@ -8,9 +8,9 @@
     return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
   }
 
-  function asTrimmedString(param, fallback = "") {
+  function asTrimmedString(param, fallback) {
     const value = unwrap(param);
-    if (value === undefined || value === null) return fallback;
+    if (value === undefined || value === null) return fallback === undefined ? "" : fallback;
     return String(value).trim();
   }
 
@@ -64,20 +64,174 @@
     target[key] = value;
   }
 
-  function base64UrlEncodeUtf8(text) {
-    const bytes = new TextEncoder().encode(text);
-    let binary = "";
-    const chunkSize = 0x8000;
+  function safeJson(obj) {
+    return JSON.stringify(obj)
+      .replace(/</g, "\\u003c")
+      .replace(/>/g, "\\u003e")
+      .replace(/&/g, "\\u0026");
+  }
 
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, chunk);
+  function buildWidgetHtml(config) {
+    const configJson = safeJson(config);
+
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
 
-    return btoa(binary)
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
+    #wrap {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #pay-btn {
+      width: 100%;
+      background: #000000;
+      color: #ffffff;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      box-sizing: border-box;
+    }
+
+    #pay-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      display: none;
+      animation: spin 1s linear infinite;
+      flex: 0 0 auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #err {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #b91c1c;
+      text-align: center;
+      display: none;
+      line-height: 1.35;
+    }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <button id="pay-btn" type="button">
+      <span id="txt">Pay with Stripe</span>
+      <span class="spinner" id="sp"></span>
+    </button>
+    <div id="err"></div>
+  </div>
+
+  <script>
+    const cfg = ${configJson};
+
+    function getCheckoutUrl(data, rawText) {
+      if (data && typeof data === "object") {
+        const fromObject =
+          data.checkout_url ||
+          data.url ||
+          data.checkoutUrl ||
+          data.session_url ||
+          (data.data && (data.data.checkout_url || data.data.url)) ||
+          (data.session && data.session.url);
+
+        if (fromObject) return String(fromObject).trim();
+      }
+
+      if (typeof rawText === "string") {
+        const stripped = rawText.replace(/^[\\"']|[\\"']$/g, "").trim();
+        if (/^https?:\\/\\//i.test(stripped)) return stripped;
+      }
+
+      return "";
+    }
+
+    async function go() {
+      const btn = document.getElementById("pay-btn");
+      const sp = document.getElementById("sp");
+      const txt = document.getElementById("txt");
+      const err = document.getElementById("err");
+
+      if (btn.disabled) return;
+
+      err.style.display = "none";
+      err.textContent = "";
+      btn.disabled = true;
+      sp.style.display = "inline-block";
+      txt.textContent = "Securing checkout...";
+
+      try {
+        const res = await fetch(cfg.webhook_url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cfg.payload)
+        });
+
+        const rawText = await res.text();
+
+        let data;
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch (_) {
+          data = null;
+        }
+
+        if (!res.ok) {
+          const message =
+            (data && (data.message || data.error)) ||
+            ("Gateway error " + res.status);
+          throw new Error(message);
+        }
+
+        const checkoutUrl = getCheckoutUrl(data, rawText);
+
+        if (!checkoutUrl || !/^https?:\\/\\//i.test(checkoutUrl)) {
+          throw new Error("No valid checkout URL was returned.");
+        }
+
+        window.top.location.href = checkoutUrl;
+      } catch (e) {
+        console.error(e);
+        btn.disabled = false;
+        sp.style.display = "none";
+        txt.textContent = cfg.button_text || "Pay with Stripe";
+        err.textContent = "Connection failed. Please try again.";
+        err.style.display = "block";
+      }
+    }
+
+    document.getElementById("txt").textContent = cfg.button_text || "Pay with Stripe";
+    document.getElementById("pay-btn").addEventListener("click", go);
+  </script>
+</body>
+</html>`;
   }
 
   window.function = function (
@@ -102,12 +256,13 @@
     tax_id_collection,
     payment_method_types,
     expires_at,
-    debug
+    button_text
   ) {
     const webhook = asTrimmedString(webhook_url);
     const checkoutMode = asTrimmedString(mode, "payment") || "payment";
     const successUrl = asTrimmedString(success_url);
     const cancelUrl = asTrimmedString(cancel_url);
+    const buttonText = asTrimmedString(button_text, "Pay with Stripe") || "Pay with Stripe";
 
     if (!webhook) throw new Error("webhook_url is required.");
     if (!successUrl) throw new Error("success_url is required.");
@@ -150,15 +305,13 @@
       throw new Error("line_items must be a JSON array for payment and subscription mode.");
     }
 
-    const launcherConfig = {
+    const widgetConfig = {
       webhook_url: webhook,
       payload: payload,
-      debug: asBoolean(debug) === true
+      button_text: buttonText
     };
 
-    const checkoutPageUrl = new URL("checkout.html", window.location.href);
-    checkoutPageUrl.hash = base64UrlEncodeUtf8(JSON.stringify(launcherConfig));
-
-    return checkoutPageUrl.toString();
+    const html = buildWidgetHtml(widgetConfig);
+    return "data:text/html;charset=utf-8," + encodeURIComponent(html);
   };
 })();
