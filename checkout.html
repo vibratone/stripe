@@ -1,0 +1,39 @@
+<html>
+<head>
+    <title>Stripe Checkout</title>
+</head>
+<body>
+    <form id="checkout-form">
+        <input type="text" name="apiKey" placeholder="Stripe API Key" required />
+        <input type="text" name="amount" placeholder="Amount in cents" required />
+        <input type="text" name="currency" placeholder="Currency" required />
+        <button type="submit">Checkout</button>
+    </form>
+
+    <script>
+        document.getElementById('checkout-form').onsubmit = async function(event) {
+            event.preventDefault(); // Prevent form submission
+            const apiKey = this.apiKey.value;
+            const amount = this.amount.value;
+            const currency = this.currency.value;
+
+            // Sending data to the Make webhook
+            const response = await fetch('https://hook.your-make-webhook-url.com', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ apiKey, amount, currency })
+            });
+
+            const data = await response.json();
+            if (data.checkoutUrl) {
+                // Redirecting to the checkout URL returned by Make
+                window.location.href = data.checkoutUrl;
+            } else {
+                alert('Error creating checkout session');
+            }
+        };
+    </script>
+</body>
+</html>
