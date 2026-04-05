@@ -25,6 +25,8 @@
     { "name": "tax_id_collection", "displayName": "Tax ID Collection (JSON)", "type": "string" },
     { "name": "payment_method_types", "displayName": "Payment Method Types (JSON)", "type": "string" },
     { "name": "expires_at", "displayName": "Expires At (Unix Timestamp)", "type": "string" },
+    { "name": "discount_total_minor", "displayName": "Discount Total Minor", "type": "string" },
+    { "name": "discount_labels", "displayName": "Discount Labels", "type": "string" },
     { "name": "button_text", "displayName": "Button Text", "type": "string" }
   ],
   "result": {
