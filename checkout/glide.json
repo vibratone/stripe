@@ -1,34 +1,33 @@
 {
-  "experimentalCodeColumn": {
-    "name": "Stripe Checkout Session",
-    "description": "Creates a Stripe Checkout Session via Make.com webhook and redirects to the hosted checkout URL.",
-    "author": "Vibratone",
-    "params": [
-      { "name": "webhook_url", "displayName": "Make Webhook URL", "type": "string" },
-      { "name": "mode", "displayName": "Mode (payment/subscription)", "type": "string", "defaultValue": "payment" },
-      { "name": "success_url", "displayName": "Success URL", "type": "string" },
-      { "name": "cancel_url", "displayName": "Cancel URL", "type": "string" },
-      { "name": "customer_email", "displayName": "Customer Email", "type": "string" },
-      { "name": "client_reference_id", "displayName": "Client Reference ID", "type": "string" },
-      { "name": "line_items", "displayName": "Line Items (JSON)", "type": "string" },
-      { "name": "discounts", "displayName": "Discounts (JSON)", "type": "string" },
-      { "name": "metadata", "displayName": "Metadata (JSON)", "type": "string" },
-      { "name": "invoice_creation", "displayName": "Invoice Creation (JSON)", "type": "string" },
-      { "name": "payment_intent_data", "displayName": "Payment Intent Data (JSON)", "type": "string" },
-      { "name": "subscription_data", "displayName": "Subscription Data (JSON)", "type": "string" },
-      { "name": "locale", "displayName": "Locale", "type": "string" },
-      { "name": "billing_address_collection", "displayName": "Billing Address Collection", "type": "string" },
-      { "name": "phone_number_collection", "displayName": "Phone Number Collection (JSON)", "type": "string" },
-      { "name": "shipping_address_collection", "displayName": "Shipping Address Collection (JSON)", "type": "string" },
-      { "name": "allow_promotion_codes", "displayName": "Allow Promotion Codes", "type": "string" },
-      { "name": "automatic_tax", "displayName": "Automatic Tax (JSON)", "type": "string" },
-      { "name": "tax_id_collection", "displayName": "Tax ID Collection (JSON)", "type": "string" },
-      { "name": "payment_method_types", "displayName": "Payment Method Types (JSON)", "type": "string" },
-      { "name": "expires_at", "displayName": "Expires At (Unix timestamp)", "type": "string" }
-    ],
-    "result": {
-      "type": "string",
-      "displayName": "Checkout Frame (Data URI)"
-    }
+  "kind": "column",
+  "name": "Stripe Checkout Launcher",
+  "description": "Builds a hosted launcher URL that creates a Stripe Checkout Session via your Make webhook when opened.",
+  "author": "Vibratone",
+  "params": [
+    { "name": "webhook_url", "displayName": "Make Webhook URL", "type": "uri" },
+    { "name": "mode", "displayName": "Mode", "type": "string" },
+    { "name": "success_url", "displayName": "Success URL", "type": "uri" },
+    { "name": "cancel_url", "displayName": "Cancel URL", "type": "uri" },
+    { "name": "customer_email", "displayName": "Customer Email", "type": "email-address" },
+    { "name": "client_reference_id", "displayName": "Client Reference ID", "type": "string" },
+    { "name": "line_items", "displayName": "Line Items (JSON)", "type": "string" },
+    { "name": "discounts", "displayName": "Discounts (JSON)", "type": "string" },
+    { "name": "metadata", "displayName": "Metadata (JSON)", "type": "string" },
+    { "name": "invoice_creation", "displayName": "Invoice Creation (JSON)", "type": "string" },
+    { "name": "payment_intent_data", "displayName": "Payment Intent Data (JSON)", "type": "string" },
+    { "name": "subscription_data", "displayName": "Subscription Data (JSON)", "type": "string" },
+    { "name": "locale", "displayName": "Locale", "type": "string" },
+    { "name": "billing_address_collection", "displayName": "Billing Address Collection", "type": "string" },
+    { "name": "phone_number_collection", "displayName": "Phone Number Collection (JSON)", "type": "string" },
+    { "name": "shipping_address_collection", "displayName": "Shipping Address Collection (JSON)", "type": "string" },
+    { "name": "allow_promotion_codes", "displayName": "Allow Promotion Codes", "type": "primitive" },
+    { "name": "automatic_tax", "displayName": "Automatic Tax (JSON)", "type": "string" },
+    { "name": "tax_id_collection", "displayName": "Tax ID Collection (JSON)", "type": "string" },
+    { "name": "payment_method_types", "displayName": "Payment Method Types (JSON)", "type": "string" },
+    { "name": "expires_at", "displayName": "Expires At (Unix Timestamp)", "type": "primitive" },
+    { "name": "debug", "displayName": "Debug", "type": "primitive" }
+  ],
+  "result": {
+    "type": "uri"
   }
 }
