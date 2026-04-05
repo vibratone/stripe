@@ -35,7 +35,7 @@
 
     const num = Number(value);
     if (!Number.isFinite(num)) {
-      throw new Error("expires_at must be a valid Unix timestamp.");
+      throw new Error("Value must be a valid integer.");
     }
 
     return Math.trunc(num);
@@ -231,11 +231,25 @@
 
         const stripeBody = toStripeBody(stripePayload);
 
+        let discountCurrency = "";
+        if (
+          Array.isArray(cfg.payload.line_items) &&
+          cfg.payload.line_items.length > 0 &&
+          cfg.payload.line_items[0] &&
+          cfg.payload.line_items[0].price_data &&
+          cfg.payload.line_items[0].price_data.currency
+        ) {
+          discountCurrency = String(cfg.payload.line_items[0].price_data.currency).trim().toLowerCase();
+        }
+
         const res = await fetch(cfg.webhook_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            stripe_body: stripeBody
+            stripe_body: stripeBody,
+            discount_total_minor: cfg.discount_total_minor || 0,
+            discount_labels: cfg.discount_labels || "",
+            discount_currency: discountCurrency
           })
         });
 
@@ -301,6 +315,8 @@
     tax_id_collection,
     payment_method_types,
     expires_at,
+    discount_total_minor,
+    discount_labels,
     button_text
   ) {
     const webhook = asTrimmedString(webhook_url);
@@ -308,6 +324,8 @@
     const successUrl = asTrimmedString(success_url);
     const cancelUrl = asTrimmedString(cancel_url);
     const buttonText = asTrimmedString(button_text, "Pay with Stripe") || "Pay with Stripe";
+    const discountTotalMinor = asInteger(discount_total_minor) || 0;
+    const discountLabels = asTrimmedString(discount_labels, "");
 
     if (!webhook) throw new Error("webhook_url is required.");
     if (!successUrl) throw new Error("success_url is required.");
@@ -353,6 +371,8 @@
     const widgetConfig = {
       webhook_url: webhook,
       payload: payload,
+      discount_total_minor: discountTotalMinor,
+      discount_labels: discountLabels,
       button_text: buttonText
     };
 
