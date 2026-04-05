@@ -41,7 +41,7 @@
     return Math.trunc(num);
   }
 
-  function parseJsonParam(name, param) {
+  function parseMaybeJSON(name, param) {
     const value = unwrap(param);
 
     if (isBlank(value)) return undefined;
@@ -68,7 +68,9 @@
     return JSON.stringify(obj)
       .replace(/</g, "\\u003c")
       .replace(/>/g, "\\u003e")
-      .replace(/&/g, "\\u0026");
+      .replace(/&/g, "\\u0026")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
   }
 
   function buildWidgetHtml(config) {
@@ -152,6 +154,40 @@
   <script>
     const cfg = ${configJson};
 
+    function flattenForStripe(obj, prefix = "", pairs = []) {
+      if (obj === null || obj === undefined) return pairs;
+
+      if (Array.isArray(obj)) {
+        obj.forEach((value, index) => {
+          flattenForStripe(value, \`\${prefix}[\${index}]\`, pairs);
+        });
+        return pairs;
+      }
+
+      if (typeof obj === "object") {
+        Object.entries(obj).forEach(([key, value]) => {
+          if (value === undefined || value === null || value === "") return;
+          const nextPrefix = prefix ? \`\${prefix}[\${key}]\` : key;
+          flattenForStripe(value, nextPrefix, pairs);
+        });
+        return pairs;
+      }
+
+      pairs.push([prefix, String(obj)]);
+      return pairs;
+    }
+
+    function toStripeBody(payload) {
+      const params = new URLSearchParams();
+      const pairs = flattenForStripe(payload);
+
+      for (const [key, value] of pairs) {
+        params.append(key, value);
+      }
+
+      return params.toString();
+    }
+
     function getCheckoutUrl(data, rawText) {
       if (data && typeof data === "object") {
         const fromObject =
@@ -188,10 +224,19 @@
       txt.textContent = "Securing checkout...";
 
       try {
+        const stripePayload = {
+          ...cfg.payload,
+          ui_mode: "hosted_page"
+        };
+
+        const stripeBody = toStripeBody(stripePayload);
+
         const res = await fetch(cfg.webhook_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cfg.payload)
+          body: JSON.stringify({
+            stripe_body: stripeBody
+          })
         });
 
         const rawText = await res.text();
@@ -279,17 +324,17 @@
     addIfPresent(payload, "locale", asTrimmedString(locale));
     addIfPresent(payload, "billing_address_collection", asTrimmedString(billing_address_collection));
 
-    addIfPresent(payload, "line_items", parseJsonParam("line_items", line_items));
-    addIfPresent(payload, "discounts", parseJsonParam("discounts", discounts));
-    addIfPresent(payload, "metadata", parseJsonParam("metadata", metadata));
-    addIfPresent(payload, "invoice_creation", parseJsonParam("invoice_creation", invoice_creation));
-    addIfPresent(payload, "payment_intent_data", parseJsonParam("payment_intent_data", payment_intent_data));
-    addIfPresent(payload, "subscription_data", parseJsonParam("subscription_data", subscription_data));
-    addIfPresent(payload, "phone_number_collection", parseJsonParam("phone_number_collection", phone_number_collection));
-    addIfPresent(payload, "shipping_address_collection", parseJsonParam("shipping_address_collection", shipping_address_collection));
-    addIfPresent(payload, "automatic_tax", parseJsonParam("automatic_tax", automatic_tax));
-    addIfPresent(payload, "tax_id_collection", parseJsonParam("tax_id_collection", tax_id_collection));
-    addIfPresent(payload, "payment_method_types", parseJsonParam("payment_method_types", payment_method_types));
+    addIfPresent(payload, "line_items", parseMaybeJSON("line_items", line_items));
+    addIfPresent(payload, "discounts", parseMaybeJSON("discounts", discounts));
+    addIfPresent(payload, "metadata", parseMaybeJSON("metadata", metadata));
+    addIfPresent(payload, "invoice_creation", parseMaybeJSON("invoice_creation", invoice_creation));
+    addIfPresent(payload, "payment_intent_data", parseMaybeJSON("payment_intent_data", payment_intent_data));
+    addIfPresent(payload, "subscription_data", parseMaybeJSON("subscription_data", subscription_data));
+    addIfPresent(payload, "phone_number_collection", parseMaybeJSON("phone_number_collection", phone_number_collection));
+    addIfPresent(payload, "shipping_address_collection", parseMaybeJSON("shipping_address_collection", shipping_address_collection));
+    addIfPresent(payload, "automatic_tax", parseMaybeJSON("automatic_tax", automatic_tax));
+    addIfPresent(payload, "tax_id_collection", parseMaybeJSON("tax_id_collection", tax_id_collection));
+    addIfPresent(payload, "payment_method_types", parseMaybeJSON("payment_method_types", payment_method_types));
 
     const allowPromotionCodes = asBoolean(allow_promotion_codes);
     if (allowPromotionCodes !== undefined) {
