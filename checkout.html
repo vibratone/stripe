@@ -1,39 +1,69 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Stripe Checkout</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Checkout Redirect</title>
 </head>
 <body>
-    <form id="checkout-form">
-        <input type="text" name="apiKey" placeholder="Stripe API Key" required />
-        <input type="text" name="amount" placeholder="Amount in cents" required />
-        <input type="text" name="currency" placeholder="Currency" required />
-        <button type="submit">Checkout</button>
-    </form>
-
     <script>
-        document.getElementById('checkout-form').onsubmit = async function(event) {
-            event.preventDefault(); // Prevent form submission
-            const apiKey = this.apiKey.value;
-            const amount = this.amount.value;
-            const currency = this.currency.value;
+        // Function to parse URL query parameters
+        function getQueryParams() {
+            const params = new URLSearchParams(window.location.search);
+            const lineItems = JSON.parse(params.get('line_items') || '[]');
+            const discounts = JSON.parse(params.get('discounts') || '[]');
+            const metadata = JSON.parse(params.get('metadata') || '{}');
+            const invoiceCreation = JSON.parse(params.get('invoice_creation') || '{}');
+            return { lineItems, discounts, metadata, invoiceCreation };
+        }
 
-            // Sending data to the Make webhook
-            const response = await fetch('https://hook.your-make-webhook-url.com', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ apiKey, amount, currency })
-            });
-
-            const data = await response.json();
-            if (data.checkoutUrl) {
-                // Redirecting to the checkout URL returned by Make
-                window.location.href = data.checkoutUrl;
-            } else {
-                alert('Error creating checkout session');
+        // Function to send payload to Make webhook
+        async function sendToWebhook(payload) {
+            const webhookUrl = 'https://your-make-webhook-url'; // replace with your Make webhook URL
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                return response.json();
+            } catch (error) {
+                console.error('Error sending to webhook:', error);
+                throw error;
             }
-        };
+        }
+
+        async function redirectToCheckout() {
+            const params = getQueryParams();
+            const { lineItems, discounts, metadata, invoiceCreation } = params;
+            const payload = { lineItems, discounts, metadata, invoiceCreation };
+            let attempts = 0;
+            const maxAttempts = 3;
+            let checkoutUrl;
+
+            while (attempts < maxAttempts) {
+                try {
+                    const data = await sendToWebhook(payload);
+                    checkoutUrl = data.checkoutUrl;
+                    if (checkoutUrl) {
+                        window.location.href = checkoutUrl;
+                        return;
+                    } else {
+                        throw new Error('Checkout URL not returned from webhook');
+                    }
+                } catch (error) {
+                    attempts++;
+                    console.error(`Attempt ${attempts} failed:`, error);
+                    if (attempts === maxAttempts) {
+                        alert('Failed to redirect after 3 attempts. Please try again later.');
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', redirectToCheckout);
     </script>
 </body>
 </html>
