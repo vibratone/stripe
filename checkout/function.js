@@ -298,6 +298,7 @@
     mode,
     success_url,
     cancel_url,
+    customer,
     customer_email,
     client_reference_id,
     line_items,
@@ -323,6 +324,7 @@
     const checkoutMode = asTrimmedString(mode, "payment") || "payment";
     const successUrl = asTrimmedString(success_url);
     const cancelUrl = asTrimmedString(cancel_url);
+    const customerId = asTrimmedString(customer);
     const buttonText = asTrimmedString(button_text, "Pay with Stripe") || "Pay with Stripe";
     const discountTotalMinor = asInteger(discount_total_minor) || 0;
     const discountLabels = asTrimmedString(discount_labels, "");
@@ -337,7 +339,12 @@
       cancel_url: cancelUrl
     };
 
-    addIfPresent(payload, "customer_email", asTrimmedString(customer_email));
+    addIfPresent(payload, "customer", customerId);
+
+    if (!customerId) {
+      addIfPresent(payload, "customer_email", asTrimmedString(customer_email));
+    }
+
     addIfPresent(payload, "client_reference_id", asTrimmedString(client_reference_id));
     addIfPresent(payload, "locale", asTrimmedString(locale));
     addIfPresent(payload, "billing_address_collection", asTrimmedString(billing_address_collection));
