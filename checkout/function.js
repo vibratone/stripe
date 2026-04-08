@@ -209,6 +209,35 @@
       return "";
     }
 
+    function getMetaValue(payload, key) {
+      if (payload && payload.metadata && payload.metadata[key] != null && payload.metadata[key] !== "") {
+        return String(payload.metadata[key]).trim();
+      }
+
+      if (
+        payload &&
+        payload.payment_intent_data &&
+        payload.payment_intent_data.metadata &&
+        payload.payment_intent_data.metadata[key] != null &&
+        payload.payment_intent_data.metadata[key] !== ""
+      ) {
+        return String(payload.payment_intent_data.metadata[key]).trim();
+      }
+
+      if (
+        payload &&
+        payload.invoice_creation &&
+        payload.invoice_creation.invoice_data &&
+        payload.invoice_creation.invoice_data.metadata &&
+        payload.invoice_creation.invoice_data.metadata[key] != null &&
+        payload.invoice_creation.invoice_data.metadata[key] !== ""
+      ) {
+        return String(payload.invoice_creation.invoice_data.metadata[key]).trim();
+      }
+
+      return "";
+    }
+
     async function go() {
       const btn = document.getElementById("pay-btn");
       const sp = document.getElementById("sp");
@@ -233,24 +262,45 @@
 
         let discountCurrency = "";
         if (
-          Array.isArray(cfg.payload.line_items) &&
-          cfg.payload.line_items.length > 0 &&
-          cfg.payload.line_items[0] &&
-          cfg.payload.line_items[0].price_data &&
-          cfg.payload.line_items[0].price_data.currency
+          Array.isArray(stripePayload.line_items) &&
+          stripePayload.line_items.length > 0 &&
+          stripePayload.line_items[0] &&
+          stripePayload.line_items[0].price_data &&
+          stripePayload.line_items[0].price_data.currency
         ) {
-          discountCurrency = String(cfg.payload.line_items[0].price_data.currency).trim().toLowerCase();
+          discountCurrency = String(stripePayload.line_items[0].price_data.currency).trim().toLowerCase();
         }
+
+        const invoiceRowId = getMetaValue(stripePayload, "invoice_row_id");
+        const clientId = getMetaValue(stripePayload, "client_id");
+        const clientName = getMetaValue(stripePayload, "client_name");
+        const customerIdFromMeta = getMetaValue(stripePayload, "customer_id");
+
+        const webhookPayload = {
+          stripe_body: stripeBody,
+          stripe_payload: stripePayload,
+          stripe_payload_json: JSON.stringify(stripePayload),
+          stripe_metadata: stripePayload.metadata || {},
+          stripe_payment_intent_metadata:
+            (stripePayload.payment_intent_data && stripePayload.payment_intent_data.metadata) || {},
+          stripe_invoice_metadata:
+            (stripePayload.invoice_creation &&
+              stripePayload.invoice_creation.invoice_data &&
+              stripePayload.invoice_creation.invoice_data.metadata) || {},
+          invoice_row_id: invoiceRowId,
+          client_id: clientId,
+          client_name: clientName,
+          customer_id: stripePayload.customer || customerIdFromMeta || "",
+          client_reference_id: stripePayload.client_reference_id || "",
+          discount_total_minor: cfg.discount_total_minor || 0,
+          discount_labels: cfg.discount_labels || "",
+          discount_currency: discountCurrency
+        };
 
         const res = await fetch(cfg.webhook_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            stripe_body: stripeBody,
-            discount_total_minor: cfg.discount_total_minor || 0,
-            discount_labels: cfg.discount_labels || "",
-            discount_currency: discountCurrency
-          })
+          body: JSON.stringify(webhookPayload)
         });
 
         const rawText = await res.text();
